@@ -1,18 +1,17 @@
 import express from "express";
-import puppeteer from "puppeteer";
+import chromium from "@sparticuz/chromium";
+import puppeteer from "puppeteer-core";
 
 const app = express();
 
 async function fetchPageWithBrowser(url) {
+  const executablePath = await chromium.executablePath();
+
   const browser = await puppeteer.launch({
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-gpu",
-      "--no-zygote",
-      "--single-process"
-    ],
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
+    executablePath,
+    headless: chromium.headless,
   });
 
   const page = await browser.newPage();
@@ -23,7 +22,9 @@ async function fetchPageWithBrowser(url) {
     "Accept-Language": "sv-SE,sv;q=0.9,en;q=0.8",
   });
 
+  console.log("🔍 Fetching:", url);
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45000 });
+
   const html = await page.content();
   await browser.close();
   return html;
@@ -38,7 +39,6 @@ app.get("/scrape/:reg", async (req, res) => {
 
   for (const url of urls) {
     try {
-      console.log(`🔍 Fetching ${url}`);
       const html = await fetchPageWithBrowser(url);
       if (html && html.length > 1000 && !html.includes("Just a moment")) {
         console.log(`✅ Success for ${reg}`);
@@ -52,5 +52,7 @@ app.get("/scrape/:reg", async (req, res) => {
   res.status(502).send("blocked");
 });
 
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`✅ Puppeteer proxy running on port ${PORT}`));
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Puppeteer proxy running on port ${PORT}`));
